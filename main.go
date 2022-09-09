@@ -32,7 +32,7 @@ func ListFiles(w http.ResponseWriter, r *http.Request) {
 	// have to split, looks like [::1]:xxxxx otherwise
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if !CheckACL(ip, AllowedIPs) {
-		fmt.Fprintln(w, "Not allowed")
+		w.WriteHeader(http.StatusForbidden)
 		log.Printf("Auth: %s not allowed\n", ip)
 		return
 	}
