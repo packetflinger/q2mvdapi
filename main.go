@@ -24,7 +24,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 
 func ListFiles(w http.ResponseWriter, r *http.Request) {
 	filesfound := Files{}
-	files, err := ioutil.ReadDir(".")
+	files, err := ioutil.ReadDir(*Target)
 	if err != nil {
 		fmt.Fprintln(w, err)
 		return
