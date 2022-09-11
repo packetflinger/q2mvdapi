@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ var ACLDomain *string
 var AllowedIPs []string
 
 type Files struct {
+	NumFiles int
 	Filename []string
 }
 
@@ -44,11 +46,16 @@ func ListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	total := 0
 	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".mvd2") {
+		// autorecorded demos in mid-recording start with _
+		if strings.HasSuffix(f.Name(), ".mvd2") && (f.Name()[0] != '_') {
 			filesfound.Filename = append(filesfound.Filename, f.Name())
+			total++
 		}
 	}
+
+	filesfound.NumFiles = total
 
 	if len(filesfound.Filename) > 0 {
 		data, _ := json.Marshal(filesfound)
@@ -56,9 +63,41 @@ func ListFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func DownloadFile(w http.ResponseWriter, r *http.Request) {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if !CheckACL(ip, AllowedIPs) {
+		w.WriteHeader(http.StatusForbidden)
+		log.Printf("Auth: %s not allowed\n", ip)
+		return
+	}
+
+	fname := r.URL.Query().Get("demo")
+	path := fmt.Sprintf("%s/%s", *Target, fname)
+	http.ServeFile(w, r, path)
+}
+
+func DeleteFile(w http.ResponseWriter, r *http.Request) {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if !CheckACL(ip, AllowedIPs) {
+		w.WriteHeader(http.StatusForbidden)
+		log.Printf("Auth: %s not allowed\n", ip)
+		return
+	}
+
+	fname := r.URL.Query().Get("demo")
+	path := fmt.Sprintf("%s/%s", *Target, fname)
+	err := os.Remove(path)
+	if err != nil {
+		fmt.Fprintln(w, err)
+	}
+}
+
 func handleRequests() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/GetMVDFiles", ListFiles)
+	http.HandleFunc("/GrabFile", DownloadFile)
+	http.HandleFunc("/NukeFile", DeleteFile)
+
 	log.Fatal(http.ListenAndServe(Listen, nil))
 }
 
@@ -88,13 +127,16 @@ func init() {
 
 	// We use a simple DNS name for an ACL.
 	// Look up the name, any IP address that resolves (v4 and v6) will be allowed
-	ips, err := net.LookupIP(*ACLDomain)
+	ips, err := net.LookupTXT(*ACLDomain)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, ip := range ips {
-		AllowedIPs = append(AllowedIPs, ip.String())
-		log.Println("Allowed IP: " + ip.String())
+		current := strings.Split(ip, ",")
+		AllowedIPs = append(AllowedIPs, current...)
 	}
+
+	log.Println("Allowed IPs:")
+	log.Println(AllowedIPs)
 }
