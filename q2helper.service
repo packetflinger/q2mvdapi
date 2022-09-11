@@ -1,0 +1,19 @@
+[Unit]
+ Description=Quake 2 Helper Service
+ ConditionPathExists=/home/quake/q2
+ After=network.target
+
+[Service]
+ Type=simple
+ User=quake
+ Group=quake
+ ExecStart=/home/quake/q2/q2helper -p 27999 -d /dev/shm -acl "_acl.pfl.gr"
+ TimeoutSec=0
+ StandardOutput=tty
+ RemainAfterExit=no
+ RestartSec=2s
+ Restart=always
+
+
+[Install]
+ WantedBy=default.target
