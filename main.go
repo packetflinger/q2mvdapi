@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -90,6 +91,32 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Fprintln(w, err)
 	}
+}
+
+// remove rcon spam from dorkbuster, and write logs from ramdisk to perm storage
+func RotateLogs(w http.ResponseWriter, r *http.Request) {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if !CheckACL(ip, AllowedIPs) {
+		w.WriteHeader(http.StatusForbidden)
+		log.Printf("Auth: %s not allowed\n", ip)
+		return
+	}
+
+	fname := r.URL.Query().Get("f")
+	path := fmt.Sprintf("%s/%s", *Target, fname)
+
+	cmd := fmt.Sprintf(
+		"cat %s | sed /Limited.rcon.*23.227.170.221/d | sed /status\\$/d >> /home/quake/q2/logs/%s",
+		path,
+		fname)
+
+	_, err := exec.Command(cmd).Output()
+	if err != nil {
+		fmt.Fprintln(w, err)
+		log.Println(err)
+		return
+	}
+
 }
 
 func handleRequests() {
